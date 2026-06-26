@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monaco Lua Editor</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #1e1e1e;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #editor-container {
+            flex: 1;
+            width: 100%;
+            min-height: 0;
+        }
+        .status-bar {
+            background-color: #007acc;
+            color: white;
+            padding: 6px 16px;
+            font-size: 13px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+            border-top: 1px solid #3a3a3a;
+        }
+        .status-bar .left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .status-bar .right {
+            opacity: 0.7;
+        }
+        .badge {
+            background-color: rgba(255, 255, 255, 0.2);
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+        /* Loading splash */
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #1e1e1e;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #cccccc;
+            font-size: 18px;
+            z-index: 1000;
+            flex-direction: column;
+            gap: 16px;
+            transition: opacity 0.4s ease;
+        }
+        #loading.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        .spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid #333;
+            border-top-color: #007acc;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loading">
+        <div class="spinner"></div>
+        <span>Loading Monaco Editor...</span>
+    </div>
+
+    <div id="editor-container"></div>
+
+    <div class="status-bar">
+        <div class="left">
+            <span>● Lua</span>
+            <span class="badge">Monaco Editor</span>
+        </div>
+        <div class="right">
+            <span id="cursor-status">Ln 1, Col 1</span>
+        </div>
+    </div>
+
+    <!-- Load Monaco Editor from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.1/min/vs/loader.min.js">
+    </script>
+
+    <script>
+        // --- Expose functions globally for CefSharp to call ---
+        window.GetText = function() {
+            if (window.editor) {
+                return window.editor.getValue();
+            }
+            return '';
+        };
+
+        window.SetText = function(text) {
+            if (window.editor) {
+                window.editor.setValue(text);
+            }
+        };
+
+        // --- Initialize Monaco ---
+        (function() {
+            // Configure the AMD loader to point to the Monaco CDN
+            require.config({
+                paths: {
+                    'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.1/min/vs'
+                }
+            });
+
+            // Load the editor
+            require(['vs/editor/editor.main'], function() {
+                // Define a custom theme (optional)
+                monaco.editor.defineTheme('lua-dark', {
+                    base: 'vs-dark',
+                    inherit: true,
+                    rules: [
+                        { token: 'comment', foreground: '6A9955', fontStyle: 'italic' },
+                        { token: 'keyword', foreground: 'C586C0' },
+                        { token: 'number', foreground: 'B5CEA8' },
+                        { token: 'string', foreground: 'CE9178' },
+                        { token: 'variable', foreground: '9CDCFE' },
+                        { token: 'identifier', foreground: 'D4D4D4' },
+                    ],
+                    colors: {
+                        'editor.background': '#1e1e1e',
+                        'editor.lineHighlightBackground': '#2a2a2a',
+                    }
+                });
+
+                // Create the editor instance
+                const editor = monaco.editor.createDocument(
+                    document.getElementById('editor-container'), {
+                        value: [
+                            '-- Welcome to the Lua Editor!',
+                            '-- Made by Salad (discord.gg/getsalad)',
+                            '',
+                            'local function greet(name)',
+                            '    print("Hello, " .. name .. "!")',
+                            'end',
+                            '',
+                            'greet("World")'
+                        ].join('\n'),
+                        language: 'lua',
+                        theme: 'lua-dark',
+                        automaticLayout: true,
+                        fontSize: 14,
+                        fontFamily: 'Cascadia Code, Consolas, monospace',
+                        minimap: {
+                            enabled: true
+                        },
+                        scrollBeyondLastLine: false,
+                        renderWhitespace: 'selection',
+                        tabSize: 4,
+                        insertSpaces: true,
+                    }
+                );
+
+                // Store editor globally
+                window.editor = editor;
+
+                // Update cursor position in status bar
+                editor.onDidChangeCursorPosition(function(e) {
+                    document.getElementById('cursor-status').textContent =
+                        'Ln ' + e.position.lineNumber + ', Col ' + e.position.column;
+                });
+
+                // Hide loading splash
+                document.getElementById('loading').classList.add('hidden');
+
+                // Auto-resize on window resize (handled by automaticLayout)
+                console.log('Monaco Editor loaded successfully!');
+            });
+        })();
+    </script>
+</body>
+</html>
