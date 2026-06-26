@@ -3,48 +3,163 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monaco Lua Editor</title>
+    <title>Monaco Tabbed Editor</title>
     <style>
-        body {
+        * {
             margin: 0;
             padding: 0;
-            background-color: #1e1e1e;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        body {
+            background: #1e1e1e;
+            height: 100vh;
             display: flex;
             flex-direction: column;
-            height: 100vh;
             overflow: hidden;
+            user-select: none;
         }
-        #editor-container {
+
+        /* ---- Tabs Bar ---- */
+        .tabs-bar {
+            display: flex;
+            align-items: center;
+            background: #252526;
+            padding: 4px 8px 0 8px;
+            border-bottom: 1px solid #3a3a3a;
+            flex-shrink: 0;
+            min-height: 36px;
+            overflow-x: auto;
+            scrollbar-width: thin;
+            gap: 2px;
+        }
+        .tabs-bar::-webkit-scrollbar {
+            height: 4px;
+        }
+        .tabs-bar::-webkit-scrollbar-thumb {
+            background: #555;
+            border-radius: 4px;
+        }
+
+        .tab {
+            display: flex;
+            align-items: center;
+            padding: 6px 12px;
+            background: #2d2d2d;
+            color: #cccccc;
+            border-radius: 6px 6px 0 0;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s, transform 0.1s;
+            white-space: nowrap;
+            border: 1px solid transparent;
+            border-bottom: none;
+            position: relative;
+        }
+        .tab:hover {
+            background: #3a3a3a;
+        }
+        .tab.active {
+            background: #1e1e1e;
+            color: #ffffff;
+            border-color: #3a3a3a;
+            border-bottom: 2px solid #007acc;
+        }
+        .tab .tab-name {
+            outline: none;
+            min-width: 30px;
+            cursor: text;
+        }
+        .tab .tab-name:focus {
+            background: rgba(255,255,255,0.05);
+        }
+        .tab .close-btn {
+            margin-left: 8px;
+            color: #888;
+            font-size: 16px;
+            line-height: 1;
+            cursor: pointer;
+            border-radius: 4px;
+            padding: 0 4px;
+            transition: background 0.2s, color 0.2s;
+        }
+        .tab .close-btn:hover {
+            background: #e81123;
+            color: #fff;
+        }
+
+        .add-tab {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            background: #2d2d2d;
+            color: #cccccc;
+            border-radius: 4px;
+            font-size: 20px;
+            font-weight: 300;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+            margin-left: 4px;
+            border: none;
+        }
+        .add-tab:hover {
+            background: #3a3a3a;
+            color: #fff;
+        }
+        .add-tab:active {
+            transform: scale(0.92);
+        }
+
+        /* ---- Editor Container ---- */
+        .editor-wrapper {
             flex: 1;
-            width: 100%;
-            min-height: 0;
+            position: relative;
+            background: #1e1e1e;
         }
+        .editor-pane {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s ease;
+        }
+        .editor-pane.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* ---- Status Bar (accent color) ---- */
         .status-bar {
-            background-color: #007acc;
+            background: #007acc;
             color: white;
-            padding: 6px 16px;
+            padding: 4px 16px;
             font-size: 13px;
             display: flex;
             justify-content: space-between;
-            align-items: center;
             flex-shrink: 0;
             border-top: 1px solid #3a3a3a;
         }
         .status-bar .left {
             display: flex;
-            align-items: center;
             gap: 16px;
+            align-items: center;
         }
-        .status-bar .right {
-            opacity: 0.7;
-        }
-        .badge {
-            background-color: rgba(255, 255, 255, 0.2);
-            padding: 2px 10px;
+        .status-bar .badge {
+            background: rgba(255,255,255,0.2);
+            padding: 0 10px;
             border-radius: 12px;
             font-size: 12px;
         }
+        .status-bar .right {
+            opacity: 0.8;
+        }
+
+        /* ---- Loading splash ---- */
         #loading {
             position: fixed;
             top: 0;
@@ -57,10 +172,10 @@
             justify-content: center;
             color: #cccccc;
             font-size: 18px;
-            z-index: 1000;
+            z-index: 9999;
             flex-direction: column;
             gap: 16px;
-            transition: opacity 0.4s ease;
+            transition: opacity 0.4s;
         }
         #loading.hidden {
             opacity: 0;
@@ -86,39 +201,229 @@
         <span>Loading Monaco Editor...</span>
     </div>
 
-    <div id="editor-container"></div>
+    <!-- Tabs Bar -->
+    <div class="tabs-bar" id="tabsBar">
+        <!-- Tabs will be inserted here -->
+        <button class="add-tab" id="addTabBtn">+</button>
+    </div>
 
+    <!-- Editor Panes -->
+    <div class="editor-wrapper" id="editorWrapper">
+        <!-- Panes will be inserted here -->
+    </div>
+
+    <!-- Status Bar -->
     <div class="status-bar">
         <div class="left">
             <span>● Lua</span>
-            <span class="badge">Monaco Editor</span>
+            <span class="badge">Monaco Tabbed</span>
         </div>
         <div class="right">
-            <span id="cursor-status">Ln 1, Col 1</span>
+            <span id="cursorStatus">Ln 1, Col 1</span>
         </div>
     </div>
 
-    <!-- Load Monaco Editor from CDN -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.1/min/vs/loader.min.js">
-    </script>
+    <!-- Monaco Loader -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.1/min/vs/loader.min.js"></script>
 
     <script>
-        // --- Expose functions globally for CefSharp to call ---
+        // ---- Global state ----
+        let tabs = [];
+        let activeTabId = null;
+        let tabCounter = 0;
+        let monacoReady = false;
+
+        // Expose functions for CefSharp
         window.GetText = function() {
-            if (window.editor) {
-                return window.editor.getValue();
-            }
-            return '';
+            const editor = getActiveEditor();
+            return editor ? editor.getValue() : '';
         };
-
         window.SetText = function(text) {
-            if (window.editor) {
-                window.editor.setValue(text);
-            }
+            const editor = getActiveEditor();
+            if (editor) editor.setValue(text);
         };
 
-        // --- Initialize Monaco ---
-        (function() {
+        // Helper to get active editor
+        function getActiveEditor() {
+            const tab = tabs.find(t => t.id === activeTabId);
+            return tab ? tab.editor : null;
+        }
+
+        // ---- Create a new tab ----
+        function createTab(name, content = '') {
+            const id = ++tabCounter;
+            const tabObj = { id, name, content, editor: null, pane: null };
+
+            // Create tab button
+            const tabEl = document.createElement('div');
+            tabEl.className = 'tab';
+            tabEl.dataset.tabId = id;
+            tabEl.innerHTML = `
+                <span class="tab-name" contenteditable="false">${name}</span>
+                <span class="close-btn" title="Close tab">×</span>
+            `;
+            // Insert before the add button
+            const addBtn = document.getElementById('addTabBtn');
+            document.getElementById('tabsBar').insertBefore(tabEl, addBtn);
+
+            // Close button
+            tabEl.querySelector('.close-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                closeTab(id);
+            });
+
+            // Double-click to rename
+            const nameSpan = tabEl.querySelector('.tab-name');
+            nameSpan.addEventListener('dblclick', () => {
+                nameSpan.contentEditable = 'true';
+                nameSpan.focus();
+                // Select all text
+                const range = document.createRange();
+                range.selectNodeContents(nameSpan);
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
+            });
+            nameSpan.addEventListener('blur', () => {
+                nameSpan.contentEditable = 'false';
+                const newName = nameSpan.textContent.trim() || 'Untitled';
+                nameSpan.textContent = newName;
+                tabObj.name = newName;
+                // Update status bar tab name
+                updateStatusBar();
+            });
+            nameSpan.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    nameSpan.blur();
+                }
+            });
+
+            // Click to activate
+            tabEl.addEventListener('click', () => activateTab(id));
+
+            // Create editor pane
+            const pane = document.createElement('div');
+            pane.className = 'editor-pane';
+            pane.id = `pane-${id}`;
+            document.getElementById('editorWrapper').appendChild(pane);
+
+            tabObj.pane = pane;
+
+            // If Monaco is ready, create editor immediately; else store for later
+            if (monacoReady) {
+                createEditorForTab(tabObj, content);
+            } else {
+                // Will be created when Monaco loads
+                tabObj.pendingContent = content;
+            }
+
+            tabs.push(tabObj);
+            // Activate this tab
+            activateTab(id);
+            updateStatusBar();
+            return tabObj;
+        }
+
+        // ---- Create Monaco editor for a tab ----
+        function createEditorForTab(tabObj, content) {
+            const pane = tabObj.pane;
+            const editor = monaco.editor.create(pane, {
+                value: content || '',
+                language: 'lua',
+                theme: 'lua-dark',
+                automaticLayout: true,
+                fontSize: 14,
+                fontFamily: 'Cascadia Code, Consolas, monospace',
+                minimap: { enabled: true },
+                scrollBeyondLastLine: false,
+                renderWhitespace: 'selection',
+                tabSize: 4,
+                insertSpaces: true,
+            });
+            tabObj.editor = editor;
+
+            // Update cursor position in status bar
+            editor.onDidChangeCursorPosition((e) => {
+                document.getElementById('cursorStatus').textContent =
+                    `Ln ${e.position.lineNumber}, Col ${e.position.column}`;
+            });
+        }
+
+        // ---- Activate a tab ----
+        function activateTab(id) {
+            if (activeTabId === id) return;
+            // Deactivate previous
+            if (activeTabId !== null) {
+                const oldTab = tabs.find(t => t.id === activeTabId);
+                if (oldTab) {
+                    oldTab.pane.classList.remove('active');
+                    const oldEl = document.querySelector(`.tab[data-tab-id="${activeTabId}"]`);
+                    if (oldEl) oldEl.classList.remove('active');
+                }
+            }
+            activeTabId = id;
+            const newTab = tabs.find(t => t.id === id);
+            if (newTab) {
+                newTab.pane.classList.add('active');
+                const newEl = document.querySelector(`.tab[data-tab-id="${id}"]`);
+                if (newEl) newEl.classList.add('active');
+                // Focus editor
+                if (newTab.editor) newTab.editor.focus();
+            }
+            updateStatusBar();
+        }
+
+        // ---- Close a tab ----
+        function closeTab(id) {
+            if (tabs.length <= 1) {
+                // Don't close the last tab, or clear it?
+                // We'll clear content instead.
+                const tab = tabs.find(t => t.id === id);
+                if (tab && tab.editor) {
+                    tab.editor.setValue('');
+                    tab.content = '';
+                }
+                return;
+            }
+            const tab = tabs.find(t => t.id === id);
+            if (!tab) return;
+
+            // Remove tab element
+            const tabEl = document.querySelector(`.tab[data-tab-id="${id}"]`);
+            if (tabEl) tabEl.remove();
+
+            // Remove pane
+            if (tab.pane) tab.pane.remove();
+
+            // Dispose editor
+            if (tab.editor) tab.editor.dispose();
+
+            // Remove from array
+            tabs = tabs.filter(t => t.id !== id);
+
+            // If active tab closed, activate another
+            if (activeTabId === id) {
+                const newActive = tabs.length > 0 ? tabs[0].id : null;
+                if (newActive !== null) {
+                    activateTab(newActive);
+                } else {
+                    activeTabId = null;
+                }
+            }
+            updateStatusBar();
+        }
+
+        // ---- Update status bar ----
+        function updateStatusBar() {
+            const activeTab = tabs.find(t => t.id === activeTabId);
+            if (activeTab) {
+                document.querySelector('.status-bar .badge').textContent = activeTab.name || 'Untitled';
+            }
+        }
+
+        // ---- Initialize Monaco and tabs ----
+        (function init() {
             require.config({
                 paths: {
                     'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.1/min/vs'
@@ -126,7 +431,7 @@
             });
 
             require(['vs/editor/editor.main'], function() {
-                // Define custom theme
+                // Define theme
                 monaco.editor.defineTheme('lua-dark', {
                     base: 'vs-dark',
                     inherit: true,
@@ -144,43 +449,52 @@
                     }
                 });
 
-                // ✅ CORRECT METHOD: monaco.editor.create (not createDocument)
-                const editor = monaco.editor.create(
-                    document.getElementById('editor-container'), {
-                        value: [
-                            '-- Welcome to the Lua Editor!',
-                            '-- Made by Salad (discord.gg/getsalad)',
-                            '',
-                            'local function greet(name)',
-                            '    print("Hello, " .. name .. "!")',
-                            'end',
-                            '',
-                            'greet("World")'
-                        ].join('\n'),
-                        language: 'lua',
-                        theme: 'lua-dark',
-                        automaticLayout: true,
-                        fontSize: 14,
-                        fontFamily: 'Cascadia Code, Consolas, monospace',
-                        minimap: { enabled: true },
-                        scrollBeyondLastLine: false,
-                        renderWhitespace: 'selection',
-                        tabSize: 4,
-                        insertSpaces: true,
-                    }
-                );
+                monacoReady = true;
 
-                window.editor = editor;
+                // Create initial tabs (one default)
+                const defaultContent = [
+                    '-- Welcome to the Lua Editor!',
+                    '-- You can rename this tab by double-clicking the name.',
+                    '',
+                    'local function greet(name)',
+                    '    print("Hello, " .. name .. "!")',
+                    'end',
+                    '',
+                    'greet("World")'
+                ].join('\n');
 
-                editor.onDidChangeCursorPosition(function(e) {
-                    document.getElementById('cursor-status').textContent =
-                        'Ln ' + e.position.lineNumber + ', Col ' + e.position.column;
-                });
+                const tab1 = createTab('Script 1', defaultContent);
+                // create a second tab with empty content
+                const tab2 = createTab('Script 2', '-- Your second script');
 
+                // Activate first
+                activateTab(tab1.id);
+
+                // Hide loading
                 document.getElementById('loading').classList.add('hidden');
-                console.log('Monaco Editor loaded successfully!');
             });
         })();
+
+        // ---- Add new tab button ----
+        document.getElementById('addTabBtn').addEventListener('click', () => {
+            const newTab = createTab(`Script ${tabs.length + 1}`, '-- New script');
+            // Rename automatically to "New Tab" with number? We'll leave it.
+        });
+
+        // ---- Handle window resize for all editors ----
+        window.addEventListener('resize', () => {
+            tabs.forEach(tab => {
+                if (tab.editor) tab.editor.layout();
+            });
+        });
+
+        // ---- Keyboard shortcut for new tab (Ctrl+N) ----
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'n') {
+                e.preventDefault();
+                document.getElementById('addTabBtn').click();
+            }
+        });
     </script>
 </body>
 </html>
