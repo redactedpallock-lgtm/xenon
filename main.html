@@ -119,16 +119,14 @@
 
         // --- Initialize Monaco ---
         (function() {
-            // Configure the AMD loader
             require.config({
                 paths: {
                     'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.1/min/vs'
                 }
             });
 
-            // Load the editor main module
             require(['vs/editor/editor.main'], function() {
-                // Define a custom theme
+                // Define custom theme
                 monaco.editor.defineTheme('lua-dark', {
                     base: 'vs-dark',
                     inherit: true,
@@ -146,7 +144,7 @@
                     }
                 });
 
-                // Create the editor instance – CORRECTED METHOD
+                // ✅ CORRECT METHOD: monaco.editor.create (not createDocument)
                 const editor = monaco.editor.create(
                     document.getElementById('editor-container'), {
                         value: [
@@ -172,18 +170,14 @@
                     }
                 );
 
-                // Store editor globally
                 window.editor = editor;
 
-                // Update cursor position in status bar
                 editor.onDidChangeCursorPosition(function(e) {
                     document.getElementById('cursor-status').textContent =
                         'Ln ' + e.position.lineNumber + ', Col ' + e.position.column;
                 });
 
-                // Hide loading splash
                 document.getElementById('loading').classList.add('hidden');
-
                 console.log('Monaco Editor loaded successfully!');
             });
         })();
