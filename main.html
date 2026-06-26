@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Monaco Tabbed Editor</title>
     <style>
+        /* --- Global reset & layout --- */
         * {
             margin: 0;
             padding: 0;
@@ -20,7 +21,7 @@
             user-select: none;
         }
 
-        /* ---- Tabs Bar ---- */
+        /* ---- Tabs Bar with custom scrollbar ---- */
         .tabs-bar {
             display: flex;
             align-items: center;
@@ -33,12 +34,23 @@
             scrollbar-width: thin;
             gap: 2px;
         }
+        /* --- Tabs bar scrollbar styling (WebKit) --- */
         .tabs-bar::-webkit-scrollbar {
-            height: 4px;
+            height: 8px;
+        }
+        .tabs-bar::-webkit-scrollbar-track {
+            background: #2d2d2d;
+            border-radius: 4px;
         }
         .tabs-bar::-webkit-scrollbar-thumb {
             background: #555;
             border-radius: 4px;
+        }
+        .tabs-bar::-webkit-scrollbar-thumb:hover {
+            background: #777;
+        }
+        .tabs-bar::-webkit-scrollbar-corner {
+            background: #2d2d2d;
         }
 
         .tab {
@@ -102,6 +114,7 @@
             transition: background 0.2s, transform 0.1s;
             margin-left: 4px;
             border: none;
+            flex-shrink: 0;
         }
         .add-tab:hover {
             background: #3a3a3a;
@@ -111,7 +124,7 @@
             transform: scale(0.92);
         }
 
-        /* ---- Gear icon (settings) ---- */
+        /* ---- Gear icon ---- */
         .settings-btn {
             margin-left: auto;
             background: transparent;
@@ -122,6 +135,7 @@
             padding: 0 8px;
             transition: color 0.2s, transform 0.2s;
             line-height: 1;
+            flex-shrink: 0;
         }
         .settings-btn:hover {
             color: #fff;
@@ -149,9 +163,9 @@
             pointer-events: auto;
         }
 
-        /* ---- Status Bar (accent color: orange) ---- */
+        /* ---- Status Bar ---- */
         .status-bar {
-            background: #FF8C00;  /* Orange accent */
+            background: #FF8C00;
             color: white;
             padding: 4px 16px;
             font-size: 13px;
@@ -202,7 +216,7 @@
             width: 32px;
             height: 32px;
             border: 3px solid #333;
-            border-top-color: #FF8C00;  /* Orange spinner */
+            border-top-color: #FF8C00;
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
         }
@@ -262,16 +276,7 @@
         .settings-panel input[type="range"] {
             width: 100%;
             margin: 6px 0 10px;
-            accent-color: #FF8C00;  /* Orange range */
-        }
-        .settings-panel .row {
-            display: flex;
-            gap: 16px;
-            align-items: center;
-        }
-        .settings-panel .row label {
-            margin: 0;
-            flex: 1;
+            accent-color: #FF8C00;
         }
         .settings-panel select {
             background: #1e1e1e;
@@ -284,7 +289,7 @@
         }
         .settings-panel .close-settings {
             margin-top: 18px;
-            background: #FF8C00;  /* Orange button */
+            background: #FF8C00;
             border: none;
             color: white;
             padding: 8px 16px;
@@ -294,12 +299,12 @@
             transition: background 0.2s;
         }
         .settings-panel .close-settings:hover {
-            background: #CC7000;  /* Darker orange */
+            background: #CC7000;
         }
     </style>
 </head>
 <body>
-
+    <!-- Loading splash -->
     <div id="loading">
         <div class="spinner"></div>
         <span>Loading Monaco Editor...</span>
@@ -333,8 +338,7 @@
         <div class="settings-panel">
             <h3>⚙ Editor Settings</h3>
             <label>Accent Color</label>
-            <input type="color" id="accentColor" value="#FF8C00"> <!-- Orange default -->
-
+            <input type="color" id="accentColor" value="#FF8C00">
             <label>Color Depth (Brightness)</label>
             <input type="range" id="colorDepth" min="0" max="200" value="100">
             <div style="display:flex; justify-content:space-between; font-size:12px; color:#888;">
@@ -342,14 +346,12 @@
                 <span>Normal</span>
                 <span>Brighter</span>
             </div>
-
             <label>Editor Theme</label>
             <select id="themeSelect">
                 <option value="lua-dark">Dark</option>
                 <option value="vs-light">Light</option>
                 <option value="vs-dark">VS Dark</option>
             </select>
-
             <button class="close-settings" id="closeSettings">Apply & Close</button>
         </div>
     </div>
@@ -363,10 +365,9 @@
         let activeTabId = null;
         let tabCounter = 0;
         let monacoReady = false;
-        let currentAccent = '#FF8C00';  // Orange
+        let currentAccent = '#FF8C00';
         let currentDepth = 100;
 
-        // Expose functions for CefSharp
         window.GetText = function() {
             const editor = getActiveEditor();
             return editor ? editor.getValue() : '';
@@ -376,13 +377,11 @@
             if (editor) editor.setValue(text);
         };
 
-        // Helper to get active editor
         function getActiveEditor() {
             const tab = tabs.find(t => t.id === activeTabId);
             return tab ? tab.editor : null;
         }
 
-        // ---- Apply accent color ----
         function applyAccent(hex, depth) {
             const r = parseInt(hex.slice(1,3), 16);
             const g = parseInt(hex.slice(3,5), 16);
@@ -392,7 +391,6 @@
             const newG = Math.min(255, Math.round(g * factor));
             const newB = Math.min(255, Math.round(b * factor));
             const finalHex = `#${newR.toString(16).padStart(2,'0')}${newG.toString(16).padStart(2,'0')}${newB.toString(16).padStart(2,'0')}`;
-
             document.getElementById('statusBar').style.background = finalHex;
             document.querySelectorAll('.tab.active').forEach(el => {
                 el.style.background = finalHex + '44';
@@ -403,11 +401,9 @@
             currentDepth = depth;
         }
 
-        // ---- Create a new tab ----
         function createTab(name, content = '') {
             const id = ++tabCounter;
             const tabObj = { id, name, content, editor: null, pane: null };
-
             const tabEl = document.createElement('div');
             tabEl.className = 'tab';
             tabEl.dataset.tabId = id;
@@ -467,7 +463,6 @@
             return tabObj;
         }
 
-        // ---- Create Monaco editor for a tab ----
         function createEditorForTab(tabObj, content) {
             const pane = tabObj.pane;
             const theme = document.getElementById('themeSelect').value || 'lua-dark';
@@ -485,14 +480,12 @@
                 insertSpaces: true,
             });
             tabObj.editor = editor;
-
             editor.onDidChangeCursorPosition((e) => {
                 document.getElementById('cursorStatus').textContent =
                     `Ln ${e.position.lineNumber}, Col ${e.position.column}`;
             });
         }
 
-        // ---- Activate a tab ----
         function activateTab(id) {
             if (activeTabId === id) return;
             if (activeTabId !== null) {
@@ -515,7 +508,6 @@
             updateStatusBar();
         }
 
-        // ---- Close a tab ----
         function closeTab(id) {
             if (tabs.length <= 1) {
                 const tab = tabs.find(t => t.id === id);
@@ -527,14 +519,11 @@
             }
             const tab = tabs.find(t => t.id === id);
             if (!tab) return;
-
             const tabEl = document.querySelector(`.tab[data-tab-id="${id}"]`);
             if (tabEl) tabEl.remove();
             if (tab.pane) tab.pane.remove();
             if (tab.editor) tab.editor.dispose();
-
             tabs = tabs.filter(t => t.id !== id);
-
             if (activeTabId === id) {
                 const newActive = tabs.length > 0 ? tabs[0].id : null;
                 if (newActive !== null) activateTab(newActive);
@@ -543,7 +532,6 @@
             updateStatusBar();
         }
 
-        // ---- Update status bar ----
         function updateStatusBar() {
             const activeTab = tabs.find(t => t.id === activeTabId);
             if (activeTab) {
@@ -551,7 +539,6 @@
             }
         }
 
-        // ---- Apply theme to all editors ----
         function applyThemeToAll(theme) {
             tabs.forEach(tab => {
                 if (tab.editor) {
@@ -560,14 +547,13 @@
             });
         }
 
-        // ---- Initialize Monaco and tabs ----
+        // ---- Initialize Monaco ----
         (function init() {
             require.config({
                 paths: {
                     'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.1/min/vs'
                 }
             });
-
             require(['vs/editor/editor.main'], function() {
                 monaco.editor.defineTheme('lua-dark', {
                     base: 'vs-dark',
@@ -585,9 +571,7 @@
                         'editor.lineHighlightBackground': '#2a2a2a',
                     }
                 });
-
                 monacoReady = true;
-
                 const defaultContent = [
                     '-- Welcome to the Lua Editor!',
                     '-- You can rename this tab by double-clicking the name.',
@@ -598,23 +582,19 @@
                     '',
                     'greet("World")'
                 ].join('\n');
-
                 const tab1 = createTab('Script 1', defaultContent);
                 createTab('Script 2', '-- Your second script');
                 activateTab(tab1.id);
                 document.getElementById('loading').classList.add('hidden');
-
-                // Apply initial orange accent
                 applyAccent('#FF8C00', 100);
             });
         })();
 
-        // ---- Add new tab ----
+        // ---- Event Listeners ----
         document.getElementById('addTabBtn').addEventListener('click', () => {
             createTab(`Script ${tabs.length + 1}`, '-- New script');
         });
 
-        // ---- Settings button ----
         document.getElementById('settingsBtn').addEventListener('click', () => {
             document.getElementById('settingsOverlay').classList.add('open');
             document.getElementById('accentColor').value = currentAccent;
@@ -622,15 +602,12 @@
             document.getElementById('themeSelect').value = monaco.editor.getTheme() || 'lua-dark';
         });
 
-        // ---- Close settings ----
         document.getElementById('closeSettings').addEventListener('click', () => {
             const overlay = document.getElementById('settingsOverlay');
             overlay.classList.remove('open');
-
             const newAccent = document.getElementById('accentColor').value;
             const newDepth = parseInt(document.getElementById('colorDepth').value);
             const newTheme = document.getElementById('themeSelect').value;
-
             currentAccent = newAccent;
             currentDepth = newDepth;
             applyAccent(newAccent, newDepth);
