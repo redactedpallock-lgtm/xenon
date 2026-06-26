@@ -50,7 +50,7 @@
             border-radius: 6px 6px 0 0;
             font-size: 13px;
             cursor: pointer;
-            transition: background 0.15s, color 0.15s, transform 0.1s;
+            transition: background 0.15s, color 0.15s;
             white-space: nowrap;
             border: 1px solid transparent;
             border-bottom: none;
@@ -59,11 +59,11 @@
         .tab:hover {
             background: #3a3a3a;
         }
+        /* Active tab – no blue underline, just a background highlight */
         .tab.active {
-            background: #1e1e1e;
+            background: #3a3a3a;
             color: #ffffff;
             border-color: #3a3a3a;
-            border-bottom: 2px solid #007acc;
         }
         .tab .tab-name {
             outline: none;
@@ -112,6 +112,23 @@
             transform: scale(0.92);
         }
 
+        /* ---- Gear icon (settings) ---- */
+        .settings-btn {
+            margin-left: auto;
+            background: transparent;
+            border: none;
+            color: #888;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 0 8px;
+            transition: color 0.2s, transform 0.2s;
+            line-height: 1;
+        }
+        .settings-btn:hover {
+            color: #fff;
+            transform: rotate(60deg);
+        }
+
         /* ---- Editor Container ---- */
         .editor-wrapper {
             flex: 1;
@@ -143,6 +160,7 @@
             justify-content: space-between;
             flex-shrink: 0;
             border-top: 1px solid #3a3a3a;
+            transition: background 0.3s;
         }
         .status-bar .left {
             display: flex;
@@ -192,6 +210,93 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+
+        /* ---- Settings Modal ---- */
+        .settings-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(4px);
+            z-index: 10000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+        .settings-overlay.open {
+            display: flex;
+        }
+        .settings-panel {
+            background: #2d2d2d;
+            color: #eee;
+            padding: 24px 30px;
+            border-radius: 12px;
+            min-width: 320px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.8);
+            border: 1px solid #444;
+            animation: fadeIn 0.25s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .settings-panel h3 {
+            margin-bottom: 16px;
+            font-weight: 400;
+            letter-spacing: 0.5px;
+        }
+        .settings-panel label {
+            display: block;
+            margin: 10px 0 4px;
+            font-size: 13px;
+            color: #aaa;
+        }
+        .settings-panel input[type="color"] {
+            width: 100%;
+            height: 36px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+        }
+        .settings-panel input[type="range"] {
+            width: 100%;
+            margin: 6px 0 10px;
+            accent-color: #007acc;
+        }
+        .settings-panel .row {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+        .settings-panel .row label {
+            margin: 0;
+            flex: 1;
+        }
+        .settings-panel select {
+            background: #1e1e1e;
+            color: #eee;
+            border: 1px solid #555;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 13px;
+            width: 100%;
+        }
+        .settings-panel .close-settings {
+            margin-top: 18px;
+            background: #007acc;
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            float: right;
+            transition: background 0.2s;
+        }
+        .settings-panel .close-settings:hover {
+            background: #005f9e;
+        }
     </style>
 </head>
 <body>
@@ -205,6 +310,7 @@
     <div class="tabs-bar" id="tabsBar">
         <!-- Tabs will be inserted here -->
         <button class="add-tab" id="addTabBtn">+</button>
+        <button class="settings-btn" id="settingsBtn" title="Settings">⚙</button>
     </div>
 
     <!-- Editor Panes -->
@@ -213,13 +319,39 @@
     </div>
 
     <!-- Status Bar -->
-    <div class="status-bar">
+    <div class="status-bar" id="statusBar">
         <div class="left">
             <span>● Lua</span>
-            <span class="badge">Monaco Tabbed</span>
+            <span class="badge" id="statusBadge">Monaco Tabbed</span>
         </div>
         <div class="right">
             <span id="cursorStatus">Ln 1, Col 1</span>
+        </div>
+    </div>
+
+    <!-- Settings Overlay -->
+    <div class="settings-overlay" id="settingsOverlay">
+        <div class="settings-panel">
+            <h3>⚙ Editor Settings</h3>
+            <label>Accent Color</label>
+            <input type="color" id="accentColor" value="#007acc">
+
+            <label>Color Depth (Brightness)</label>
+            <input type="range" id="colorDepth" min="0" max="200" value="100">
+            <div style="display:flex; justify-content:space-between; font-size:12px; color:#888;">
+                <span>Darker</span>
+                <span>Normal</span>
+                <span>Brighter</span>
+            </div>
+
+            <label>Editor Theme</label>
+            <select id="themeSelect">
+                <option value="lua-dark">Dark</option>
+                <option value="vs-light">Light</option>
+                <option value="vs-dark">VS Dark</option>
+            </select>
+
+            <button class="close-settings" id="closeSettings">Apply & Close</button>
         </div>
     </div>
 
@@ -232,6 +364,8 @@
         let activeTabId = null;
         let tabCounter = 0;
         let monacoReady = false;
+        let currentAccent = '#007acc';
+        let currentDepth = 100;
 
         // Expose functions for CefSharp
         window.GetText = function() {
@@ -247,6 +381,33 @@
         function getActiveEditor() {
             const tab = tabs.find(t => t.id === activeTabId);
             return tab ? tab.editor : null;
+        }
+
+        // ---- Apply accent color ----
+        function applyAccent(hex, depth) {
+            // Convert hex to HSL, adjust lightness by depth, then back to hex
+            const r = parseInt(hex.slice(1,3), 16);
+            const g = parseInt(hex.slice(3,5), 16);
+            const b = parseInt(hex.slice(5,7), 16);
+            // Simple brightness scaling (depth 0-200, 100 = normal)
+            const factor = depth / 100;
+            const newR = Math.min(255, Math.round(r * factor));
+            const newG = Math.min(255, Math.round(g * factor));
+            const newB = Math.min(255, Math.round(b * factor));
+            const finalHex = `#${newR.toString(16).padStart(2,'0')}${newG.toString(16).padStart(2,'0')}${newB.toString(16).padStart(2,'0')}`;
+
+            // Update status bar background
+            document.getElementById('statusBar').style.background = finalHex;
+            // Update active tab background (we'll use a subtle highlight)
+            document.querySelectorAll('.tab.active').forEach(el => {
+                el.style.background = finalHex + '44'; // semi-transparent
+                el.style.borderColor = finalHex;
+            });
+            // Update any other accent elements (like buttons)
+            document.querySelector('.close-settings').style.background = finalHex;
+            // Store for future tabs
+            currentAccent = hex;
+            currentDepth = depth;
         }
 
         // ---- Create a new tab ----
@@ -277,7 +438,6 @@
             nameSpan.addEventListener('dblclick', () => {
                 nameSpan.contentEditable = 'true';
                 nameSpan.focus();
-                // Select all text
                 const range = document.createRange();
                 range.selectNodeContents(nameSpan);
                 const sel = window.getSelection();
@@ -289,7 +449,6 @@
                 const newName = nameSpan.textContent.trim() || 'Untitled';
                 nameSpan.textContent = newName;
                 tabObj.name = newName;
-                // Update status bar tab name
                 updateStatusBar();
             });
             nameSpan.addEventListener('keydown', (e) => {
@@ -310,16 +469,13 @@
 
             tabObj.pane = pane;
 
-            // If Monaco is ready, create editor immediately; else store for later
             if (monacoReady) {
                 createEditorForTab(tabObj, content);
             } else {
-                // Will be created when Monaco loads
                 tabObj.pendingContent = content;
             }
 
             tabs.push(tabObj);
-            // Activate this tab
             activateTab(id);
             updateStatusBar();
             return tabObj;
@@ -328,10 +484,11 @@
         // ---- Create Monaco editor for a tab ----
         function createEditorForTab(tabObj, content) {
             const pane = tabObj.pane;
+            const theme = document.getElementById('themeSelect').value || 'lua-dark';
             const editor = monaco.editor.create(pane, {
                 value: content || '',
                 language: 'lua',
-                theme: 'lua-dark',
+                theme: theme,
                 automaticLayout: true,
                 fontSize: 14,
                 fontFamily: 'Cascadia Code, Consolas, monospace',
@@ -343,7 +500,6 @@
             });
             tabObj.editor = editor;
 
-            // Update cursor position in status bar
             editor.onDidChangeCursorPosition((e) => {
                 document.getElementById('cursorStatus').textContent =
                     `Ln ${e.position.lineNumber}, Col ${e.position.column}`;
@@ -353,7 +509,6 @@
         // ---- Activate a tab ----
         function activateTab(id) {
             if (activeTabId === id) return;
-            // Deactivate previous
             if (activeTabId !== null) {
                 const oldTab = tabs.find(t => t.id === activeTabId);
                 if (oldTab) {
@@ -368,7 +523,8 @@
                 newTab.pane.classList.add('active');
                 const newEl = document.querySelector(`.tab[data-tab-id="${id}"]`);
                 if (newEl) newEl.classList.add('active');
-                // Focus editor
+                // Apply accent to active tab
+                applyAccent(currentAccent, currentDepth);
                 if (newTab.editor) newTab.editor.focus();
             }
             updateStatusBar();
@@ -377,8 +533,6 @@
         // ---- Close a tab ----
         function closeTab(id) {
             if (tabs.length <= 1) {
-                // Don't close the last tab, or clear it?
-                // We'll clear content instead.
                 const tab = tabs.find(t => t.id === id);
                 if (tab && tab.editor) {
                     tab.editor.setValue('');
@@ -389,27 +543,17 @@
             const tab = tabs.find(t => t.id === id);
             if (!tab) return;
 
-            // Remove tab element
             const tabEl = document.querySelector(`.tab[data-tab-id="${id}"]`);
             if (tabEl) tabEl.remove();
-
-            // Remove pane
             if (tab.pane) tab.pane.remove();
-
-            // Dispose editor
             if (tab.editor) tab.editor.dispose();
 
-            // Remove from array
             tabs = tabs.filter(t => t.id !== id);
 
-            // If active tab closed, activate another
             if (activeTabId === id) {
                 const newActive = tabs.length > 0 ? tabs[0].id : null;
-                if (newActive !== null) {
-                    activateTab(newActive);
-                } else {
-                    activeTabId = null;
-                }
+                if (newActive !== null) activateTab(newActive);
+                else activeTabId = null;
             }
             updateStatusBar();
         }
@@ -418,8 +562,17 @@
         function updateStatusBar() {
             const activeTab = tabs.find(t => t.id === activeTabId);
             if (activeTab) {
-                document.querySelector('.status-bar .badge').textContent = activeTab.name || 'Untitled';
+                document.getElementById('statusBadge').textContent = activeTab.name || 'Untitled';
             }
+        }
+
+        // ---- Apply theme to all editors ----
+        function applyThemeToAll(theme) {
+            tabs.forEach(tab => {
+                if (tab.editor) {
+                    monaco.editor.setTheme(theme);
+                }
+            });
         }
 
         // ---- Initialize Monaco and tabs ----
@@ -451,7 +604,6 @@
 
                 monacoReady = true;
 
-                // Create initial tabs (one default)
                 const defaultContent = [
                     '-- Welcome to the Lua Editor!',
                     '-- You can rename this tab by double-clicking the name.',
@@ -464,31 +616,60 @@
                 ].join('\n');
 
                 const tab1 = createTab('Script 1', defaultContent);
-                // create a second tab with empty content
-                const tab2 = createTab('Script 2', '-- Your second script');
-
-                // Activate first
+                createTab('Script 2', '-- Your second script');
                 activateTab(tab1.id);
-
-                // Hide loading
                 document.getElementById('loading').classList.add('hidden');
+
+                // Apply initial accent
+                applyAccent('#007acc', 100);
             });
         })();
 
-        // ---- Add new tab button ----
+        // ---- Add new tab ----
         document.getElementById('addTabBtn').addEventListener('click', () => {
-            const newTab = createTab(`Script ${tabs.length + 1}`, '-- New script');
-            // Rename automatically to "New Tab" with number? We'll leave it.
+            createTab(`Script ${tabs.length + 1}`, '-- New script');
         });
 
-        // ---- Handle window resize for all editors ----
+        // ---- Settings button ----
+        document.getElementById('settingsBtn').addEventListener('click', () => {
+            document.getElementById('settingsOverlay').classList.add('open');
+            // Populate current settings
+            document.getElementById('accentColor').value = currentAccent;
+            document.getElementById('colorDepth').value = currentDepth;
+            document.getElementById('themeSelect').value = monaco.editor.getTheme() || 'lua-dark';
+        });
+
+        // ---- Close settings ----
+        document.getElementById('closeSettings').addEventListener('click', () => {
+            const overlay = document.getElementById('settingsOverlay');
+            overlay.classList.remove('open');
+
+            // Apply settings
+            const newAccent = document.getElementById('accentColor').value;
+            const newDepth = parseInt(document.getElementById('colorDepth').value);
+            const newTheme = document.getElementById('themeSelect').value;
+
+            currentAccent = newAccent;
+            currentDepth = newDepth;
+            applyAccent(newAccent, newDepth);
+            applyThemeToAll(newTheme);
+        });
+
+        // Close settings by clicking on overlay background
+        document.getElementById('settingsOverlay').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) {
+                document.getElementById('settingsOverlay').classList.remove('open');
+            }
+        });
+
+        // ---- Resize all editors ----
         window.addEventListener('resize', () => {
             tabs.forEach(tab => {
                 if (tab.editor) tab.editor.layout();
             });
         });
 
-        // ---- Keyboard shortcut for new tab (Ctrl+N) ----
+        // ---- Keyboard shortcut: Ctrl+N ----
         document.addEventListener('keydown', (e) => {
             if (e.ctrlKey && e.key === 'n') {
                 e.preventDefault();
