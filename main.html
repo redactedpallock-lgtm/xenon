@@ -45,7 +45,6 @@
             border-radius: 12px;
             font-size: 12px;
         }
-        /* Loading splash */
         #loading {
             position: fixed;
             top: 0;
@@ -120,16 +119,16 @@
 
         // --- Initialize Monaco ---
         (function() {
-            // Configure the AMD loader to point to the Monaco CDN
+            // Configure the AMD loader
             require.config({
                 paths: {
                     'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.1/min/vs'
                 }
             });
 
-            // Load the editor
+            // Load the editor main module
             require(['vs/editor/editor.main'], function() {
-                // Define a custom theme (optional)
+                // Define a custom theme
                 monaco.editor.defineTheme('lua-dark', {
                     base: 'vs-dark',
                     inherit: true,
@@ -147,8 +146,8 @@
                     }
                 });
 
-                // Create the editor instance
-                const editor = monaco.editor.createDocument(
+                // Create the editor instance – CORRECTED METHOD
+                const editor = monaco.editor.create(
                     document.getElementById('editor-container'), {
                         value: [
                             '-- Welcome to the Lua Editor!',
@@ -165,9 +164,7 @@
                         automaticLayout: true,
                         fontSize: 14,
                         fontFamily: 'Cascadia Code, Consolas, monospace',
-                        minimap: {
-                            enabled: true
-                        },
+                        minimap: { enabled: true },
                         scrollBeyondLastLine: false,
                         renderWhitespace: 'selection',
                         tabSize: 4,
@@ -187,7 +184,6 @@
                 // Hide loading splash
                 document.getElementById('loading').classList.add('hidden');
 
-                // Auto-resize on window resize (handled by automaticLayout)
                 console.log('Monaco Editor loaded successfully!');
             });
         })();
